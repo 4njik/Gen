@@ -6,7 +6,7 @@ const int length = 100;
 const int popSize = 200;
 const double pCrossover = 0.9;
 const double pMutation = 0.1;
-const int maxGeneration = 50;
+const int maxGeneration = 1000;
 
 
 List<int> Create_Gen()
@@ -24,29 +24,60 @@ List<int> Create_Gen()
 int Fitness(List<int> gen)
 {
     int fitness = 0;
-    for (int i = 0; i < length;i++)
+    for (int i=0; i < length-1; i++)
     {
-        fitness += gen[i];
+        if (gen[i] == 1 & gen[i + 1] == 0)
+        {
+            fitness++;
+        }
     }
 
     return fitness;
 }
 
-List<List<int>> Selection(List<List<int>> pop, List<int> fit)
+List<List<int>> TornamentSelection(List<List<int>> pop, List<int> fit)
 {
     List<List<int>> next = new List<List<int>>();
-    Random random = new Random();  
+    Random random = new Random();
     while (next.Count != popSize)
     {
-        int i1 = random.Next(0,popSize);
-        int i2 = random.Next(0,popSize);
+        int i1 = random.Next(0, popSize);
+        int i2 = random.Next(0, popSize);
 
         if (i1 == i2) { continue; }
 
         if (fit[i1] > fit[i2]) { next.Add(pop[i1]); }
-        else { next.Add(pop[i2]);}
+        else { next.Add(pop[i2]); }
     }
 
+    return next;
+}
+
+List<List<int>> ProportionalSelection(List<List<int>> pop, List<int> fit)
+{
+    List<List<int>> next = new List<List<int>>();
+    List<double> chances = new List<double>();
+    Random random = new Random();
+    double roll;
+    int S = fit.Sum();
+    chances.Add(fit[0] / S);
+    for (int i = 1; i < popSize; i++)
+    {
+        chances.Add(fit[i] / S + fit[i-1]);
+    }
+
+    while (next.Count < pop.Count)
+    {
+        roll = random.NextDouble()*S;
+        for (int j = 0; j < chances.Count; j++)
+        {
+            if (roll == chances[j])
+            {
+                next.Add(pop[j]);
+                break;
+            }
+        }
+    }
     return next;
 }
 
@@ -98,10 +129,6 @@ List<int> fitnessValues = new List<int>();
 List<int> maxFitnessValues = new List<int>();
 List<double> meanFitnessValues = new List<double>();
 
-int count = 0;
-int maxFitness = 0;
-double meanFitness = 0;
-
 for (int i = 0; i < popSize; i++)
 {
     population.Add(Create_Gen());
@@ -113,52 +140,106 @@ for (int i = 0; i < popSize; i++)
     fitnessValues.Add(Fitness(population[i]));
 }
 
-while (maxFitness != length & count < maxGeneration)
+void TornamentSelectionGeneration(List<List<int>> pop, List<int> fit)
 {
-    
-    count++;
+    int count = 0;
+    int maxFitness = 0;
+    double meanFitness = 0;
 
-    Random rand = new Random();
-
-
-    population = Selection(population, fitnessValues);
-
-    for (int i = 0; i < popSize -1; i = i + 2)
+    while (maxFitness != length & count < maxGeneration)
     {
-        List<int> child1 = population[i];
-        List<int> child2 = population[i+1];
-        if (rand.NextDouble() < pCrossover)
+
+        count++;
+
+        Random rand = new Random();
+
+
+        pop = TornamentSelection(pop, fit);
+
+        for (int i = 0; i < popSize - 1; i = i + 2)
         {
-            Crossover(ref child1, ref child2);
-            population[i] = child1;
-            population[i+1] = child2;
+            List<int> child1 = pop[i];
+            List<int> child2 = pop[i + 1];
+            if (rand.NextDouble() < pCrossover)
+            {
+                Crossover(ref child1, ref child2);
+                pop[i] = child1;
+                pop[i + 1] = child2;
+            }
         }
-    }
 
-    for (int i = 0; i < popSize; i++)
-    {
-        if (rand.NextDouble() < pMutation)
+        for (int i = 0; i < popSize; i++)
         {
-            List<int> child = population[i];
-            Mutation(ref child, 1.0/length);
+            if (rand.NextDouble() < pMutation)
+            {
+                List<int> child = pop[i];
+                Mutation(ref child, 1.0 / length);
+            }
         }
-    }
 
-    fitnessValues.Clear();
-    for (int i = 0; i < popSize; i++)
-    {
-        fitnessValues.Add(Fitness(population[i]));
-    }
+        fit.Clear();
+        for (int i = 0; i < popSize; i++)
+        {
+            fit.Add(Fitness(pop[i]));
+        }
 
-    maxFitness = fitnessValues.Max();
-    meanFitness = fitnessValues.Sum() / popSize;
-    maxFitnessValues.Add(maxFitness);
-    meanFitnessValues.Add(meanFitness);
+        maxFitness = fit.Max();
+
+    }
+    Console.WriteLine("Турнирный отбор:");
+    Console.WriteLine($"Кол-во поколений: {count}, лучшая полезность: {maxFitness}");
 }
 
-Console.WriteLine(count.ToString());
 
-for (int i = 0; i < maxFitnessValues.Count; i++)
+void ProportionalSelectionGeneration(List<List<int>> pop, List<int> fit)
 {
-    Console.WriteLine($"{i}: {maxFitnessValues[i]}, {meanFitnessValues[i]}");
+    int count = 0;
+    int maxFitness = 0;
+    double meanFitness = 0;
+
+    while (maxFitness != length & count < maxGeneration)
+    {
+
+        count++;
+
+        Random rand = new Random();
+
+
+        pop = ProportionalSelection(pop, fit);
+
+        for (int i = 0; i < popSize - 1; i = i + 2)
+        {
+            List<int> child1 = pop[i];
+            List<int> child2 = pop[i + 1];
+            if (rand.NextDouble() < pCrossover)
+            {
+                Crossover(ref child1, ref child2);
+                pop[i] = child1;
+                pop[i + 1] = child2;
+            }
+        }
+
+        for (int i = 0; i < popSize; i++)
+        {
+            if (rand.NextDouble() < pMutation)
+            {
+                List<int> child = pop[i];
+                Mutation(ref child, 1.0 / length);
+            }
+        }
+
+        fit.Clear();
+        for (int i = 0; i < popSize; i++)
+        {
+            fit.Add(Fitness(pop[i]));
+        }
+
+        maxFitness = fit.Max();
+
+    }
+    Console.WriteLine("Пропорциональный отбор:");
+    Console.WriteLine($"Кол-во поколений: {count}, лучшая полезность: {maxFitness}");
 }
+
+TornamentSelectionGeneration(population, fitnessValues);
+ProportionalSelectionGeneration(population, fitnessValues);
